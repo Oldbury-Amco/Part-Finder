@@ -1,69 +1,75 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AMCO Part Finder</title>
-  <meta name="theme-color" content="#b71c1c" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Part Finder</title>
+  <meta name="description" content="Mobile-friendly part finder for GitHub Pages" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app-shell">
     <header class="hero">
-      <div class="hero__brand">
-        <div class="hero__logo">A</div>
-        <div>
-          <p class="eyebrow">Mobile Part Lookup</p>
-          <h1>AMCO Part Finder</h1>
-        </div>
+      <div class="hero__eyebrow">Part Finder</div>
+      <h1>Part Selector</h1>
+      <p>Select buttons below to narrow the list. Results show part number and description only.</p>
+      <div class="hero__actions">
+        <button id="resetAllBtn" class="btn btn--ghost">Reset All</button>
       </div>
-      <p class="hero__text">Select a model to instantly view matching part numbers and descriptions.</p>
     </header>
 
-    <main class="main">
-      <section class="panel controls">
-        <div class="controls__top">
-          <div>
-            <p class="section-label">Step 1</p>
-            <h2>Choose model</h2>
+    <main class="content">
+      <section class="panel panel--summary">
+        <div class="summary">
+          <div class="summary__item">
+            <span class="summary__label">Results</span>
+            <strong id="resultCount">0</strong>
           </div>
-          <button id="clearFilters" class="ghost-btn" type="button">Clear</button>
-        </div>
-
-        <div id="modelButtons" class="chip-grid" aria-label="Model options"></div>
-
-        <div class="search-wrap">
-          <label for="searchInput" class="section-label">Step 2</label>
-          <input
-            id="searchInput"
-            class="search-input"
-            type="search"
-            placeholder="Search part number or description"
-            autocomplete="off"
-          />
+          <div class="summary__item">
+            <span class="summary__label">Active Filters</span>
+            <div id="activeChips" class="chips chips--small"></div>
+          </div>
         </div>
       </section>
 
-      <section class="panel results">
-        <div class="results__top">
-          <div>
-            <p class="section-label">Results</p>
-            <h2 id="resultsTitle">All parts</h2>
-          </div>
-          <div id="resultCount" class="count-pill">0 parts</div>
-        </div>
+      <section id="filters" class="filters"></section>
 
-        <div id="activeFilters" class="active-filters"></div>
-
-        <div id="resultsList" class="results-list"></div>
-        <div id="emptyState" class="empty-state" hidden>
-          <div class="empty-state__icon">⌕</div>
-          <h3>No matching parts found</h3>
-          <p>Try another model or adjust the search text.</p>
+      <section class="panel panel--results">
+        <div class="results-header">
+          <h2>Matching Parts</h2>
+          <div id="resultsNote" class="results-note"></div>
         </div>
+        <div id="results" class="results"></div>
       </section>
     </main>
   </div>
+
+  <template id="filterSectionTemplate">
+    <section class="panel filter-panel">
+      <div class="filter-panel__head">
+        <div>
+          <div class="filter-step"></div>
+          <h3 class="filter-title"></h3>
+        </div>
+        <button class="clear-filter btn btn--tiny btn--ghost" type="button">Clear</button>
+      </div>
+      <div class="button-grid"></div>
+    </section>
+  </template>
+
+  <template id="resultCardTemplate">
+    <article class="result-card">
+      <div class="result-card__top">
+        <div>
+          <div class="result-card__label">Part Number</div>
+          <div class="result-card__number"></div>
+        </div>
+        <button class="btn btn--tiny copy-btn" type="button">Copy</button>
+      </div>
+      <div class="result-card__label">Description</div>
+      <div class="result-card__description"></div>
+    </article>
+  </template>
 
   <script src="app.js"></script>
 </body>
