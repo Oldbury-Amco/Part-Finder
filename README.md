@@ -1,6 +1,6 @@
 # Part Finder
 
-Static mobile-friendly part finder for GitHub Pages.
+Static GitHub Pages app for mobile-friendly part lookup.
 
 ## Files
 - `index.html`
@@ -9,12 +9,10 @@ Static mobile-friendly part finder for GitHub Pages.
 - `parts_data.json`
 - `.nojekyll`
 
-## Deploy
-Upload all files to the root of your GitHub repository and enable GitHub Pages from:
+## GitHub Pages
+Upload all files to the root of the repository and enable Pages from:
 - Branch: `main`
 - Folder: `/ (root)`
 
 ## Notes
-- The app uses button-based filters.
-- Results show part number and description only.
-- The data file must stay named `parts_data.json` unless you also change `app.js`.
+This version includes the wider category dataset, including families such as SILL and RADSHELL.

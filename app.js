@@ -1,251 +1,188 @@
-const FILTERS = [
-  { key: "model", label: "Model" },
-  { key: "colour", label: "Colour" },
-  { key: "partType", label: "Part Type" },
-  { key: "position", label: "Position" },
-  { key: "side", label: "Side" },
-  { key: "category", label: "Category" },
-  { key: "subCategory", label: "Sub-Category" }
-];
 
 const state = {
-  data: [],
-  selected: Object.fromEntries(FILTERS.map(f => [f.key, ""]))
+  model: '',
+  family: '',
+  colour: '',
+  partType: '',
+  category: '',
+  position: '',
+  side: '',
+  search: ''
 };
 
-const el = {
-  filters: document.getElementById("filters"),
-  results: document.getElementById("results"),
-  resultCount: document.getElementById("resultCount"),
-  resultsNote: document.getElementById("resultsNote"),
-  activeChips: document.getElementById("activeChips"),
-  resetAllBtn: document.getElementById("resetAllBtn"),
-  filterTemplate: document.getElementById("filterSectionTemplate"),
-  cardTemplate: document.getElementById("resultCardTemplate")
+const filterOrder = ['model', 'family', 'colour', 'partType', 'category', 'position', 'side'];
+let allParts = [];
+
+const els = {
+  modelButtons: document.getElementById('modelButtons'),
+  familyButtons: document.getElementById('familyButtons'),
+  colourButtons: document.getElementById('colourButtons'),
+  partTypeButtons: document.getElementById('partTypeButtons'),
+  categoryButtons: document.getElementById('categoryButtons'),
+  positionButtons: document.getElementById('positionButtons'),
+  sideButtons: document.getElementById('sideButtons'),
+  results: document.getElementById('results'),
+  resultsCount: document.getElementById('resultsCount'),
+  searchBox: document.getElementById('searchBox'),
+  resetBtn: document.getElementById('resetBtn'),
+  activeFilters: document.getElementById('activeFilters')
 };
 
-document.addEventListener("DOMContentLoaded", init);
-
-async function init() {
-  try {
-    const response = await fetch("parts_data.json", { cache: "no-store" });
-    if (!response.ok) throw new Error("Unable to load parts_data.json");
-    state.data = await response.json();
-    bindEvents();
-    render();
-  } catch (error) {
-    el.results.innerHTML = `<div class="empty-state">Could not load the data file.<br>${escapeHtml(error.message)}</div>`;
-    el.resultsNote.textContent = "Check that parts_data.json is in the same folder as index.html.";
-  }
-}
-
-function bindEvents() {
-  el.resetAllBtn.addEventListener("click", () => {
-    for (const filter of FILTERS) state.selected[filter.key] = "";
-    render();
-  });
-}
-
-function render() {
-  renderFilters();
-  renderActiveChips();
-  renderResults();
-}
-
-function renderFilters() {
-  el.filters.innerHTML = "";
-  let narrowedData = state.data;
-
-  FILTERS.forEach((filter, index) => {
-    const options = getOptionsForFilter(filter.key, narrowedData);
-    const selectedValue = state.selected[filter.key];
-    const shouldShow = options.length > 1 || !!selectedValue;
-
-    if (!shouldShow) {
-      narrowedData = applyFiltersUntil(filter.key);
-      return;
-    }
-
-    const section = el.filterTemplate.content.firstElementChild.cloneNode(true);
-    section.querySelector(".filter-step").textContent = `Step ${index + 1}`;
-    section.querySelector(".filter-title").textContent = filter.label;
-
-    const clearBtn = section.querySelector(".clear-filter");
-    clearBtn.disabled = !selectedValue;
-    clearBtn.addEventListener("click", () => {
-      clearFromFilter(filter.key);
-      render();
-    });
-
-    const grid = section.querySelector(".button-grid");
-    options.forEach(option => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "btn btn--option" + (selectedValue === option ? " active" : "");
-      button.textContent = formatLabel(option);
-      button.addEventListener("click", () => {
-        state.selected[filter.key] = state.selected[filter.key] === option ? "" : option;
-        clearFollowingFilters(filter.key);
-        render();
-      });
-      grid.appendChild(button);
-    });
-
-    el.filters.appendChild(section);
-    narrowedData = narrowedData.filter(item => !selectedValue || item[filter.key] === selectedValue);
-  });
-}
-
-function renderActiveChips() {
-  const active = FILTERS.filter(f => state.selected[f.key]);
-  el.activeChips.innerHTML = "";
-
-  if (!active.length) {
-    el.activeChips.innerHTML = '<span class="chip">No filters selected</span>';
-    return;
-  }
-
-  active.forEach(filter => {
-    const chip = document.createElement("span");
-    chip.className = "chip";
-    chip.textContent = `${filter.label}: ${formatLabel(state.selected[filter.key])}`;
-    el.activeChips.appendChild(chip);
-  });
-}
-
-function renderResults() {
-  const data = getFilteredResults();
-  el.resultCount.textContent = data.length.toLocaleString();
-  el.resultsNote.textContent = data.length ? "Tap copy to copy a part number." : "No matching parts for the current selection.";
-  el.results.innerHTML = "";
-
-  if (!data.length) {
-    el.results.innerHTML = '<div class="empty-state">No parts match the filters selected.<br>Use Reset All or clear one of the filters above.</div>';
-    return;
-  }
-
-  data
-    .sort((a, b) => a.partNumber.localeCompare(b.partNumber))
-    .forEach(item => {
-      const card = el.cardTemplate.content.firstElementChild.cloneNode(true);
-      card.querySelector(".result-card__number").textContent = item.partNumber;
-      card.querySelector(".result-card__description").textContent = formatDescription(item.description);
-
-      const copyBtn = card.querySelector(".copy-btn");
-      copyBtn.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(item.partNumber);
-          showToast(`Copied ${item.partNumber}`);
-        } catch {
-          showToast("Copy failed on this device");
-        }
-      });
-
-      el.results.appendChild(card);
-    });
-}
-
-function getFilteredResults() {
-  return state.data.filter(item =>
-    FILTERS.every(filter => !state.selected[filter.key] || item[filter.key] === state.selected[filter.key])
-  );
-}
-
-function getOptionsForFilter(filterKey, scopedData) {
-  const scoped = applyEarlierSelections(filterKey, scopedData);
-  const values = [...new Set(scoped.map(item => item[filterKey]).filter(Boolean))];
-  return values.sort(sortOptions);
-}
-
-function applyEarlierSelections(filterKey, scopedData = state.data) {
-  const index = FILTERS.findIndex(f => f.key === filterKey);
-  return scopedData.filter(item => {
-    return FILTERS.slice(0, index).every(filter => !state.selected[filter.key] || item[filter.key] === state.selected[filter.key]);
-  });
-}
-
-function applyFiltersUntil(filterKey) {
-  const index = FILTERS.findIndex(f => f.key === filterKey);
-  return state.data.filter(item =>
-    FILTERS.slice(0, index + 1).every(filter => !state.selected[filter.key] || item[filter.key] === state.selected[filter.key])
-  );
-}
-
-function clearFollowingFilters(filterKey) {
-  const index = FILTERS.findIndex(f => f.key === filterKey);
-  FILTERS.slice(index + 1).forEach(filter => state.selected[filter.key] = "");
-}
-
-function clearFromFilter(filterKey) {
-  const index = FILTERS.findIndex(f => f.key === filterKey);
-  FILTERS.slice(index).forEach(filter => state.selected[filter.key] = "");
-}
-
-function sortOptions(a, b) {
-  const numA = Number(a);
-  const numB = Number(b);
-  const bothNumeric = !Number.isNaN(numA) && !Number.isNaN(numB);
-  return bothNumeric ? numA - numB : String(a).localeCompare(String(b));
-}
-
-function formatLabel(value) {
-  if (!value) return "";
-  let text = String(value).trim().replace(/\s+/g, " ");
-
-  const replacements = {
-    "LH": "LH",
-    "RH": "RH",
-    "PDC": "PDC",
-    "ROW": "ROW",
-    "NAR": "NAR",
-    "PLA": "PLA",
-    "MY27": "MY27"
-  };
-
-  text = text
-    .split(" ")
-    .map(word => {
-      const clean = word.replace(/[^\w/()-]/g, "");
-      if (replacements[word.toUpperCase()]) return replacements[word.toUpperCase()];
-      if (/^[A-Z0-9/-]{2,5}$/.test(word)) return word.toUpperCase();
-      if (/^\d+$/.test(word)) return word;
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    })
-    .join(" ");
-
-  text = text.replace(/\bSt James\b/i, "St James");
-  text = text.replace(/\bSub-category\b/i, "Sub-Category");
-  return text;
-}
-
-function formatDescription(value) {
-  return formatLabel(value)
-    .replace(/\bBy634\/5\b/g, "BY634/5")
-    .replace(/\bLh\b/g, "LH")
-    .replace(/\bRh\b/g, "RH")
-    .replace(/\bPdc\b/g, "PDC");
+function normaliseValue(v) {
+  return (v || '').toString().trim();
 }
 
 function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, char => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  }[char]));
+  return str
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
-let toastTimeout;
-function showToast(message) {
-  let toast = document.querySelector(".toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.className = "toast";
-    document.body.appendChild(toast);
-  }
-  toast.textContent = message;
-  toast.classList.add("show");
-  clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => toast.classList.remove("show"), 1600);
+function titleCaseLabel(text) {
+  if (!text) return 'Unknown';
+  return text
+    .toLowerCase()
+    .split(/\s+/)
+    .map(word => {
+      if (['lh','rh'].includes(word)) return word.toUpperCase();
+      if (word === 'by631') return 'BY631';
+      if (word === 'by634/5') return 'BY634/5';
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
 }
+
+function filteredParts(ignoreKey = null) {
+  return allParts.filter(part => {
+    for (const key of filterOrder) {
+      if (key === ignoreKey) continue;
+      if (state[key] && normaliseValue(part[key]) !== state[key]) return false;
+    }
+    if (state.search) {
+      const hay = `${part.partNumber} ${part.description}`.toLowerCase();
+      if (!hay.includes(state.search.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
+function uniqueValues(key) {
+  const items = filteredParts(key)
+    .map(item => normaliseValue(item[key]))
+    .filter(Boolean);
+
+  return [...new Set(items)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function renderButtons(container, key, values) {
+  container.innerHTML = '';
+  if (!values.length) {
+    container.innerHTML = '<p class="muted">No options for current selection.</p>';
+    return;
+  }
+
+  values.forEach(value => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `filter-btn${state[key] === value ? ' active' : ''}`;
+    btn.textContent = titleCaseLabel(value);
+    btn.addEventListener('click', () => {
+      state[key] = state[key] === value ? '' : value;
+
+      const idx = filterOrder.indexOf(key);
+      for (let i = idx + 1; i < filterOrder.length; i += 1) {
+        state[filterOrder[i]] = '';
+      }
+
+      renderAll();
+    });
+    container.appendChild(btn);
+  });
+}
+
+function renderActiveFilters() {
+  const active = filterOrder.filter(key => state[key]).map(key => `${titleCaseLabel(key.replace(/([A-Z])/g, ' $1'))}: ${titleCaseLabel(state[key])}`);
+  if (state.search) active.push(`Search: ${state.search}`);
+  els.activeFilters.innerHTML = active.length
+    ? active.map(item => `<span class="active-pill">${escapeHtml(item)}</span>`).join('')
+    : '<p class="muted">No filters selected.</p>';
+}
+
+function renderResults() {
+  const results = filteredParts();
+  els.resultsCount.textContent = `${results.length} part${results.length === 1 ? '' : 's'} found`;
+
+  if (!results.length) {
+    els.results.innerHTML = '<div class="empty-state">No parts match the current filters.</div>';
+    return;
+  }
+
+  els.results.innerHTML = results
+    .slice(0, 500)
+    .map(part => `
+      <article class="result-item">
+        <div class="result-meta">
+          <p class="part-number">${escapeHtml(part.partNumber)}</p>
+          <p class="part-desc">${escapeHtml(part.description || 'No description')}</p>
+        </div>
+        <button class="copy-btn" type="button" data-part="${escapeHtml(part.partNumber)}">Copy</button>
+      </article>
+    `)
+    .join('');
+
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const part = btn.getAttribute('data-part');
+      try {
+        await navigator.clipboard.writeText(part);
+        const old = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(() => btn.textContent = old, 1200);
+      } catch {
+        btn.textContent = 'Copy failed';
+        setTimeout(() => btn.textContent = 'Copy', 1200);
+      }
+    });
+  });
+}
+
+function renderAll() {
+  renderButtons(els.modelButtons, 'model', uniqueValues('model'));
+  renderButtons(els.familyButtons, 'family', uniqueValues('family'));
+  renderButtons(els.colourButtons, 'colour', uniqueValues('colour'));
+  renderButtons(els.partTypeButtons, 'partType', uniqueValues('partType'));
+  renderButtons(els.categoryButtons, 'category', uniqueValues('category'));
+  renderButtons(els.positionButtons, 'position', uniqueValues('position'));
+  renderButtons(els.sideButtons, 'side', uniqueValues('side'));
+  renderActiveFilters();
+  renderResults();
+}
+
+async function init() {
+  try {
+    const res = await fetch('parts_data.json');
+    allParts = await res.json();
+    renderAll();
+  } catch (err) {
+    els.results.innerHTML = '<div class="empty-state">Unable to load parts data. Check that parts_data.json is in the same folder as index.html.</div>';
+    els.resultsCount.textContent = 'Data load failed';
+  }
+}
+
+els.searchBox.addEventListener('input', (e) => {
+  state.search = e.target.value.trim();
+  renderActiveFilters();
+  renderResults();
+});
+
+els.resetBtn.addEventListener('click', () => {
+  for (const key of filterOrder) state[key] = '';
+  state.search = '';
+  els.searchBox.value = '';
+  renderAll();
+});
+
+init();
