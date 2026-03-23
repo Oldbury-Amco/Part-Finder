@@ -1,259 +1,154 @@
-const DATA_FILE = 'bentley_bumper_catalog_data.json';
+const state = {
+  parts: [],
+  filteredParts: [],
+  selectedModel: "",
+  searchText: ""
+};
 
-const filtersContainer = document.getElementById('filtersContainer');
-const resultsEl = document.getElementById('results');
-const resultsCountEl = document.getElementById('resultsCount');
-const activeFiltersEl = document.getElementById('activeFilters');
-const resetAllBtn = document.getElementById('resetAllBtn');
-const clearTextBtn = document.getElementById('clearTextBtn');
-const textSearchEl = document.getElementById('textSearch');
-const cardTemplate = document.getElementById('resultCardTemplate');
+const elements = {
+  modelButtons: document.getElementById("modelButtons"),
+  searchInput: document.getElementById("searchInput"),
+  resultsList: document.getElementById("resultsList"),
+  emptyState: document.getElementById("emptyState"),
+  resultCount: document.getElementById("resultCount"),
+  resultsTitle: document.getElementById("resultsTitle"),
+  activeFilters: document.getElementById("activeFilters"),
+  clearFilters: document.getElementById("clearFilters")
+};
 
-let appData = null;
-let parts = [];
-let selectedFilters = {};
-let searchText = '';
-
-const filterOrder = ['model', 'variant', 'colour', 'partType', 'category', 'subCategory'];
-
-function normalise(value) {
-  return String(value ?? '').trim().toLowerCase();
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
-function includesText(part, query) {
-  const haystack = [
-    part.material,
-    part.materialDescription,
-    part.model,
-    part.variant,
-    part.colour,
-    part.partType,
-    part.category,
-    part.subCategory,
-    part.supplierName
-  ].join(' ').toLowerCase();
-
-  return haystack.includes(query);
-}
-
-function getLabel(key) {
-  return appData?.fieldLabels?.[key] || key;
-}
-
-function initSelectedFilters() {
-  selectedFilters = {};
-  filterOrder.forEach(key => {
-    selectedFilters[key] = new Set();
-  });
-}
-
-function getFilteredParts() {
-  return parts.filter(part => {
-    const textMatch = !searchText || includesText(part, searchText);
-
-    const filterMatch = filterOrder.every(key => {
-      const selections = selectedFilters[key];
-      if (!selections || selections.size === 0) return true;
-      return selections.has(String(part[key] ?? ''));
-    });
-
-    return textMatch && filterMatch;
-  });
-}
-
-function getPreviewParts(excludeKey = null) {
-  return parts.filter(part => {
-    const textMatch = !searchText || includesText(part, searchText);
-
-    const filterMatch = filterOrder.every(key => {
-      if (key === excludeKey) return true;
-      const selections = selectedFilters[key];
-      if (!selections || selections.size === 0) return true;
-      return selections.has(String(part[key] ?? ''));
-    });
-
-    return textMatch && filterMatch;
-  });
-}
-
-function toggleSelection(key, value) {
-  const set = selectedFilters[key];
-  if (set.has(value)) {
-    set.delete(value);
-  } else {
-    set.add(value);
+async function loadData() {
+  try {
+    const response = await fetch("parts_data.json");
+    const data = await response.json();
+    state.parts = data.parts || [];
+    renderModelButtons(data.models || []);
+    applyFilters();
+  } catch (error) {
+    elements.resultsList.innerHTML = '<div class="empty-state"><h3>Unable to load data</h3><p>Check that parts_data.json is in the same folder as this page.</p></div>';
   }
-  render();
 }
 
-function clearAll() {
-  initSelectedFilters();
-  searchText = '';
-  textSearchEl.value = '';
-  render();
-}
+function renderModelButtons(models) {
+  elements.modelButtons.innerHTML = "";
 
-function removeChip(key, value) {
-  selectedFilters[key].delete(value);
-  render();
-}
+  const allButton = createChip("All Models", !state.selectedModel, () => {
+    state.selectedModel = "";
+    applyFilters();
+  });
+  elements.modelButtons.appendChild(allButton);
 
-function buildFilters() {
-  filtersContainer.innerHTML = '';
-
-  filterOrder.forEach(key => {
-    const group = document.createElement('section');
-    group.className = 'filter-group';
-
-    const title = document.createElement('h3');
-    title.textContent = getLabel(key);
-    group.appendChild(title);
-
-    const buttonGroup = document.createElement('div');
-    buttonGroup.className = 'button-group';
-
-    const previewParts = getPreviewParts(key);
-    const availableValues = new Set(previewParts.map(part => String(part[key] ?? '')).filter(Boolean));
-    const allValues = appData.filters[key] || [];
-
-    allValues.forEach(value => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'filter-btn';
-      btn.textContent = value;
-
-      const isActive = selectedFilters[key].has(value);
-      const isAvailable = availableValues.has(value);
-
-      if (isActive) btn.classList.add('active');
-      if (!isAvailable && !isActive) btn.classList.add('disabled');
-
-      btn.addEventListener('click', () => toggleSelection(key, value));
-      buttonGroup.appendChild(btn);
+  models.forEach((model) => {
+    const button = createChip(model, state.selectedModel === model, () => {
+      state.selectedModel = model;
+      applyFilters();
     });
-
-    group.appendChild(buttonGroup);
-    filtersContainer.appendChild(group);
+    elements.modelButtons.appendChild(button);
   });
 }
 
-function buildActiveChips() {
-  activeFiltersEl.innerHTML = '';
-
-  const entries = [];
-  filterOrder.forEach(key => {
-    selectedFilters[key].forEach(value => {
-      entries.push({ key, value });
-    });
-  });
-
-  if (searchText) {
-    const chip = document.createElement('button');
-    chip.className = 'chip';
-    chip.textContent = `Search: ${searchText} ×`;
-    chip.addEventListener('click', () => {
-      searchText = '';
-      textSearchEl.value = '';
-      render();
-    });
-    activeFiltersEl.appendChild(chip);
-  }
-
-  entries.forEach(({ key, value }) => {
-    const chip = document.createElement('button');
-    chip.className = 'chip';
-    chip.textContent = `${getLabel(key)}: ${value} ×`;
-    chip.addEventListener('click', () => removeChip(key, value));
-    activeFiltersEl.appendChild(chip);
-  });
+function createChip(label, active, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `chip${active ? " is-active" : ""}`;
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
 }
 
-function copyText(value, button) {
-  navigator.clipboard.writeText(value).then(() => {
-    const original = button.textContent;
-    button.textContent = 'Copied';
-    setTimeout(() => (button.textContent = original), 1200);
+function applyFilters() {
+  const search = state.searchText.trim().toLowerCase();
+
+  state.filteredParts = state.parts.filter((part) => {
+    const matchesModel = !state.selectedModel || part.model === state.selectedModel;
+    const haystack = `${part.material} ${part.description}`.toLowerCase();
+    const matchesSearch = !search || haystack.includes(search);
+    return matchesModel && matchesSearch;
   });
+
+  state.filteredParts.sort((a, b) => {
+    if (a.material === b.material) return a.description.localeCompare(b.description);
+    return a.material.localeCompare(b.material);
+  });
+
+  refreshControls();
+  renderResults();
 }
 
-function buildResults() {
-  const filtered = getFilteredParts();
-  resultsEl.innerHTML = '';
-  resultsCountEl.textContent = `${filtered.length} part${filtered.length === 1 ? '' : 's'} found`;
+function refreshControls() {
+  const chipButtons = [...elements.modelButtons.querySelectorAll(".chip")];
+  chipButtons.forEach((button) => {
+    const active = (button.textContent === "All Models" && !state.selectedModel)
+      || button.textContent === state.selectedModel;
+    button.classList.toggle("is-active", active);
+  });
 
-  if (filtered.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.innerHTML = '<strong>No matching parts found.</strong><br>Try removing a filter or broadening your search.';
-    resultsEl.appendChild(empty);
+  const active = [];
+  if (state.selectedModel) active.push(`<span class="filter-pill">Model: ${escapeHtml(state.selectedModel)}</span>`);
+  if (state.searchText.trim()) active.push(`<span class="filter-pill">Search: ${escapeHtml(state.searchText.trim())}</span>`);
+
+  elements.activeFilters.innerHTML = active.join("");
+  elements.resultsTitle.textContent = state.selectedModel ? `${state.selectedModel} parts` : "All parts";
+  elements.resultCount.textContent = `${state.filteredParts.length} part${state.filteredParts.length === 1 ? "" : "s"}`;
+}
+
+function renderResults() {
+  if (!state.filteredParts.length) {
+    elements.resultsList.innerHTML = "";
+    elements.emptyState.hidden = false;
     return;
   }
 
-  filtered.forEach(part => {
-    const node = cardTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector('.part-number').textContent = part.material || 'Unknown';
-    node.querySelector('.part-description').textContent = part.materialDescription || '';
+  elements.emptyState.hidden = true;
+  elements.resultsList.innerHTML = state.filteredParts.map((part) => `
+    <article class="result-card">
+      <div class="result-card__top">
+        <div class="part-number">${escapeHtml(part.material)}</div>
+        <button class="copy-btn" type="button" data-copy="${escapeHtml(part.material)}">Copy</button>
+      </div>
+      <p class="description">${escapeHtml(part.description)}</p>
+      <div class="meta-row">
+        <span class="meta-pill">${escapeHtml(part.model)}</span>
+        ${part.partType ? `<span class="meta-pill">${escapeHtml(part.partType)}</span>` : ""}
+        ${part.colour ? `<span class="meta-pill">${escapeHtml(part.colour)}</span>` : ""}
+      </div>
+    </article>
+  `).join("");
 
-    const copyBtn = node.querySelector('.copy-btn');
-    copyBtn.addEventListener('click', () => copyText(part.material || '', copyBtn));
-
-    const metaGrid = node.querySelector('.meta-grid');
-
-    const fields = [
-      ['Model', part.model],
-      ['Variant', part.variant],
-      ['Colour', part.colour],
-      ['Part Type', part.partType],
-      ['Category', part.category],
-      ['Subcategory', part.subCategory],
-      ['Supplier', part.supplierName]
-    ];
-
-    fields.forEach(([label, value]) => {
-      if (!value) return;
-      const item = document.createElement('div');
-      item.className = 'meta-item';
-      item.innerHTML = `
-        <div class="meta-label">${label}</div>
-        <div class="meta-value">${value}</div>
-      `;
-      metaGrid.appendChild(item);
+  elements.resultsList.querySelectorAll("[data-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const value = button.getAttribute("data-copy");
+      try {
+        await navigator.clipboard.writeText(value);
+        const previous = button.textContent;
+        button.textContent = "Copied";
+        setTimeout(() => button.textContent = previous, 1200);
+      } catch {
+        button.textContent = "Copy failed";
+        setTimeout(() => button.textContent = "Copy", 1200);
+      }
     });
-
-    resultsEl.appendChild(node);
   });
 }
 
-function render() {
-  buildFilters();
-  buildActiveChips();
-  buildResults();
-}
-
-async function init() {
-  try {
-    const response = await fetch(DATA_FILE);
-    if (!response.ok) throw new Error('Could not load data file.');
-    appData = await response.json();
-    parts = appData.parts || [];
-    initSelectedFilters();
-    render();
-  } catch (error) {
-    resultsEl.innerHTML = `<div class="empty-state"><strong>App error</strong><br>${error.message}</div>`;
-    resultsCountEl.textContent = 'Unable to load data';
-  }
-}
-
-resetAllBtn.addEventListener('click', clearAll);
-clearTextBtn.addEventListener('click', () => {
-  searchText = '';
-  textSearchEl.value = '';
-  render();
+elements.searchInput.addEventListener("input", (event) => {
+  state.searchText = event.target.value || "";
+  applyFilters();
 });
 
-textSearchEl.addEventListener('input', event => {
-  searchText = event.target.value.trim().toLowerCase();
-  render();
+elements.clearFilters.addEventListener("click", () => {
+  state.selectedModel = "";
+  state.searchText = "";
+  elements.searchInput.value = "";
+  applyFilters();
 });
 
-init();
+loadData();
