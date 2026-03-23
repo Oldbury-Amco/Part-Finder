@@ -1,18 +1,14 @@
-# Part Finder
+# AMCO Part Finder
 
-Static GitHub Pages app for mobile-friendly part lookup.
+Static GitHub Pages app for mobile-friendly AMCO part lookup.
 
 ## Files
 - `index.html`
 - `style.css`
 - `app.js`
 - `parts_data.json`
-- `.nojekyll`
+- `amco-logo.webp`
+- `.nojekyll` (recommended in repo root)
 
-## GitHub Pages
-Upload all files to the root of the repository and enable Pages from:
-- Branch: `main`
-- Folder: `/ (root)`
-
-## Notes
-This version includes the wider category dataset, including families such as SILL and RADSHELL.
+## Update on GitHub
+Replace the files above in the root of the repository, commit, and allow GitHub Pages a minute to redeploy.

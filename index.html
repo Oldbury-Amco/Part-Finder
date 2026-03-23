@@ -3,16 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Part Finder</title>
+  <title>AMCO Part Finder</title>
+  <meta name="theme-color" content="#d71920" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app-shell">
     <header class="hero">
       <div class="hero__inner">
-        <p class="eyebrow">Mobile Part Lookup</p>
-        <h1>Part Finder</h1>
-        <p class="hero__text">Choose filters below to narrow the list. Results show part number and description only.</p>
+        <div class="brand-lockup">
+          <img src="amco-logo.webp" alt="AMCO logo" class="brand-logo" />
+          <div>
+            <p class="eyebrow">AMCO Mobile Part Lookup</p>
+            <h1>Part Finder</h1>
+            <p class="hero__text">Select the most relevant buttons below to narrow the list. Results show part number and description only for fast shop-floor lookup.</p>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -21,15 +27,15 @@
         <div class="toolbar__top">
           <div>
             <h2>Filters</h2>
-            <p class="muted">Start with a model, then refine with the most useful options.</p>
+            <p class="muted">Start with a model, then refine by the most useful options.</p>
           </div>
-          <button id="resetBtn" class="ghost-btn" type="button">Reset all</button>
+          <button id="resetBtn" class="ghost-btn" type="button">Reset All</button>
         </div>
         <div id="activeFilters" class="active-filters"></div>
       </section>
 
       <section class="filters-grid">
-        <div class="card filter-card">
+        <div class="card filter-card accent-card">
           <h3>1. Model</h3>
           <div id="modelButtons" class="button-grid"></div>
         </div>
@@ -71,7 +77,7 @@
             <h2>Matching Parts</h2>
             <p id="resultsCount" class="muted">Loading…</p>
           </div>
-          <input id="searchBox" class="search-box" type="search" placeholder="Optional search in description or part number" />
+          <input id="searchBox" class="search-box" type="search" placeholder="Optional search by part number or description" />
         </div>
         <div id="results" class="results-list"></div>
       </section>
